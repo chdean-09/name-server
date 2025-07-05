@@ -1,12 +1,11 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { DeviceGateway } from './device/device.gateway';
 import { DeviceModule } from './device/device.module';
-import { PrismaModule } from './prisma.module';
-import { DeviceGateway } from './websocket/device.gateway';
 
 @Module({
-  imports: [PrismaModule, DeviceModule],
+  imports: [DeviceModule],
   controllers: [AppController],
   providers: [AppService, DeviceGateway],
 })
