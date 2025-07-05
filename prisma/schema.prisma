@@ -6,7 +6,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -22,20 +21,40 @@ model User {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   PairingSession PairingSession[]
+  Command        Command[]
 }
 
 model Device {
   id             String           @id @default(cuid())
   name           String
-  macAddress     String           @unique // Bluetooth MAC or some UUID
+  macAddress     String           @unique // Bluetooth MAC address
+  ipAddress      String?          // ESP32 IP address after WiFi connection
   wifiSSID       String?
-  ownerId        String
-  owner          User             @relation(fields: [ownerId], references: [id])
+  ownerId        String?
+  owner          User?            @relation(fields: [ownerId], references: [id])
   isClaimed      Boolean          @default(false)
-  lastCommand    CommandType
+  isOnline       Boolean          @default(false)
+  lastSeen       DateTime?
+  pairingCode    String?          // Temporary pairing code for BLE pairing
+  apiKey         String?          // Device API key for authentication
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   PairingSession PairingSession[]
+  Command        Command[]
+}
+
+model Command {
+  id       String        @id @default(cuid())
+  deviceId String
+  device   Device        @relation(fields: [deviceId], references: [id])
+  userId   String
+  user     User          @relation(fields: [userId], references: [id])
+  type     CommandType
+  doorId   Int           // Which door (1, 2, or 3)
+  status   CommandStatus @default(PENDING)
+  sentAt   DateTime      @default(now())
+  executedAt DateTime?
+  response String?
 }
 
 enum CommandType {
