@@ -1,35 +1,89 @@
 #include <WiFi.h>
 #include <WebServer.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <ArduinoJson.h>
 
 // Replace with your network credentials
-const char* ssid = "OPPO A18";
-const char* password = "q9pzjmgg";
+const char* ssid = "qwertypasd";
+const char* password = "2444666668888888";
 
-// Relay pins (door locks)
-const int relayPins[3] = {23, 22, 21};
-
-// Door sensor pins
-const int doorSensorPins[3] = {19, 18, 5};
+const int doorPin = 12;
+const int sensorPin = 19;
 
 // Buzzer pin
 const int buzzerPin = 4;
 
-// Create web server on port 80
-WebServer server(80);
+// Create AsyncWebServer object on port 80
+AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
+
+void notifySensorState() {
+  int state = digitalRead(sensorPin);
+  String json = "{\"sensor\":" + String(state) + "}";
+  ws.textAll(json);
+}
+
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
+  AwsFrameInfo *info = (AwsFrameInfo*)arg;
+
+  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+    data[len] = 0;
+    String msg = String((char*)data);
+
+    // Expecting: {"command":"lock"} or {"command":"unlock"}
+    DynamicJsonDocument doc(128);
+    DeserializationError error = deserializeJson(doc, msg);
+
+    String command = doc["command"];
+
+    if (command == "lock") {
+      digitalWrite(doorPin, LOW); // Lock the door
+    } else if (command == "unlock") {
+      digitalWrite(doorPin, HIGH); // Unlock the door
+    }
+  }
+}
+
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+  switch (type) {
+    case WS_EVT_CONNECT: {
+      Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+  
+      // Send current state to new client
+      String json = "{\"sensor\":" + String(digitalRead(sensorPin)) +
+                    ",\"lock\":" + String(digitalRead(doorPin)) +
+                    ",\"buzzer\":" + String(digitalRead(buzzerPin)) + "}";
+      client->text(json);  // Send only to the new client
+      Serial.println(json);
+      break;
+    }
+    case WS_EVT_DISCONNECT:
+      Serial.println("Client disconnected");
+      break;
+    case WS_EVT_DATA:
+      handleWebSocketMessage(arg, data, len);
+      break;
+    case WS_EVT_ERROR:
+    case WS_EVT_PONG:
+      break;
+  }
+}
+
+void initWebSocket() {
+  ws.onEvent(onEvent);
+  server.addHandler(&ws);
+}
+
 
 void setup() {
   Serial.begin(115200);
 
-  // Set up relay pins
-  for (int i = 0; i < 3; i++) {
-    pinMode(relayPins[i], OUTPUT);
-    digitalWrite(relayPins[i], LOW); // Assuming active HIGH relay
-  }
+  pinMode(doorPin, OUTPUT);
+  digitalWrite(doorPin, LOW);
 
-  // Set up door sensor pins
-  for (int i = 0; i < 3; i++) {
-    pinMode(doorSensorPins[i], INPUT_PULLDOWN);
-  }
+  pinMode(sensorPin, INPUT_PULLDOWN);
+
 
   // Set up buzzer pin
   pinMode(buzzerPin, OUTPUT);
@@ -39,7 +93,7 @@ void setup() {
 
   // Connect to WiFi
   WiFi.begin(ssid, password);
-  Serial.print("Connecting to WiFi...");
+  Serial.print("Connecting to WiFi");
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     Serial.print(".");
@@ -48,56 +102,13 @@ void setup() {
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
+  initWebSocket();
+
+  Serial.println("WebSocket initialized.");
+
   // Define server routes
-  server.on("/", HTTP_GET, []() {
-    server.send(200, "text/plain", "ESP32 Door Lock System");
-  });
-
-  // Control individual relay (lock/unlock door)
-  server.on("/door", HTTP_GET, []() {
-    if (server.hasArg("door") && server.hasArg("state")) {
-      int door = server.arg("door").toInt();
-      String state = server.arg("state");
-      if (door >= 1 && door <= 3) {
-        if (state == "on") {
-          digitalWrite(relayPins[door - 1], LOW); // Lock
-          server.send(200, "text/plain", "Door " + String(door) + " locked");
-        } else if (state == "off") {
-          digitalWrite(relayPins[door - 1], HIGH); // Unlock
-          server.send(200, "text/plain", "Door " + String(door) + " unlocked");
-        } else {
-          server.send(400, "text/plain", "Invalid state");
-        }
-      } else {
-        server.send(400, "text/plain", "Invalid door");
-      }
-    } else {
-      server.send(400, "text/plain", "Missing parameters");
-    }
-  });
-
-  //Send buzzer status
-  server.on("/buzzer", HTTP_GET, []() {
-    int buzzerState = digitalRead(buzzerPin);
-    server.send(200, "text/plain", String(buzzerState)); // 1=ON, 0=OFF
-  });
-
-  // Send door sensor 1 state
-  server.on("/door_sensor1", HTTP_GET, []() {
-    int state = digitalRead(doorSensorPins[0]);
-    server.send(200, "text/plain", String(state));
-  });
-
-  // Send door sensor 2 state
-  server.on("/door_sensor2", HTTP_GET, []() {
-    int state = digitalRead(doorSensorPins[1]);
-    server.send(200, "text/plain", String(state));
-  });
-
-  // Send door sensor 3 state
-  server.on("/door_sensor3", HTTP_GET, []() {
-    int state = digitalRead(doorSensorPins[2]);
-    server.send(200, "text/plain", String(state));
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+     request->send(200, "text/plain", "ESP32 Door Lock System with WebSocket");
   });
 
   // Start server
@@ -105,20 +116,34 @@ void setup() {
 }
 
 void loop() {
-  server.handleClient();
+  ws.cleanupClients();  // Clean up WebSocket clients
 
-  // Check sensors and buzzer logic
-  bool buzzerOn = false;
-  for (int i = 0; i < 3; i++) {
-    int sensorState = digitalRead(doorSensorPins[i]);
-    int lockState = digitalRead(relayPins[i]); // LOW = locked, HIGH = unlocked
+  // Read current sensor and lock states
+  int sensorState = digitalRead(sensorPin); // LOW = door open, HIGH = closed
+  int lockState = digitalRead(doorPin);     // LOW = locked, HIGH = unlocked
 
-    // If door is open while locked, activate buzzer
-    if (sensorState == LOW && lockState == LOW) {
-      buzzerOn = true;
-    }
+  // 🔔 Trigger buzzer if door is open while locked
+  bool buzzerOn = (sensorState == LOW && lockState == LOW);
+  digitalWrite(buzzerPin, buzzerOn ? HIGH : LOW);
+
+  // 📡 Notify clients if state changes
+  static int lastSensorState = -1;
+  static int lastLockState = -1;
+  static bool lastBuzzerState = false;
+
+  if (sensorState != lastSensorState || lockState != lastLockState || buzzerOn != lastBuzzerState) {
+    lastSensorState = sensorState;
+    lastLockState = lockState;
+    lastBuzzerState = buzzerOn;
+
+    String json = "{\"sensor\":" + String(sensorState) +
+                  ",\"lock\":" + String(lockState) +
+                  ",\"buzzer\":" + String(buzzerOn) + "}";
+    Serial.println(json);
+    ws.textAll(json);
   }
 
-  // Control buzzer
-  digitalWrite(buzzerPin, buzzerOn ? HIGH : LOW);
+  // Small delay is optional, helps reduce loop churn
+  delay(50);
 }
+
