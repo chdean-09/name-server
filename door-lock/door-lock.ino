@@ -1,12 +1,13 @@
 #include <WiFi.h>
 #include <WebServer.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
+#include <WebSocketsClient.h>
 
 // Replace with your network credentials
-const char* ssid = "qwertypasd";
-const char* password = "2444666668888888";
+const char* ssid = "PLDTHOMEFIBR_AP5G";
+const char* password = "AndradaFamily321-PLDT-5ghz";
+
+const char* socketUrl = "example.com";
 
 const int doorPin = 12;
 const int sensorPin = 19;
@@ -14,65 +15,27 @@ const int sensorPin = 19;
 // Buzzer pin
 const int buzzerPin = 4;
 
-// Create AsyncWebServer object on port 80
-AsyncWebServer server(80);
-AsyncWebSocket ws("/ws");
+WebSocketsClient webSocket;
 
-void notifySensorState() {
-  int state = digitalRead(sensorPin);
-  String json = "{\"sensor\":" + String(state) + "}";
-  ws.textAll(json);
-}
-
-void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
-  AwsFrameInfo *info = (AwsFrameInfo*)arg;
-
-  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
-    data[len] = 0;
-    String msg = String((char*)data);
-
-    // Expecting: {"command":"lock"} or {"command":"unlock"}
-    DynamicJsonDocument doc(128);
-    DeserializationError error = deserializeJson(doc, msg);
-
-    String command = doc["command"];
-
-    if (command == "lock") {
-      digitalWrite(doorPin, LOW); // Lock the door
-    } else if (command == "unlock") {
-      digitalWrite(doorPin, HIGH); // Unlock the door
-    }
-  }
-}
-
-void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
-  switch (type) {
-    case WS_EVT_CONNECT: {
-      Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
-  
-      // Send current state to new client
-      String json = "{\"sensor\":" + String(digitalRead(sensorPin)) +
-                    ",\"lock\":" + String(digitalRead(doorPin)) +
-                    ",\"buzzer\":" + String(digitalRead(buzzerPin)) + "}";
-      client->text(json);  // Send only to the new client
-      Serial.println(json);
+void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
+  switch(type) {
+    case WStype_DISCONNECTED:
+      Serial.println("[WS] Disconnected");
       break;
-    }
-    case WS_EVT_DISCONNECT:
-      Serial.println("Client disconnected");
+    case WStype_CONNECTED:
+      Serial.println("[WS] Connected to server");
+      webSocket.sendTXT("{\"sensor\":1,\"lock\":0,\"buzzer\":0}");
       break;
-    case WS_EVT_DATA:
-      handleWebSocketMessage(arg, data, len);
-      break;
-    case WS_EVT_ERROR:
-    case WS_EVT_PONG:
+    case WStype_TEXT:
+      Serial.printf("[WS] Got message: %s\n", payload);
+      // Handle lock/unlock
+      if (strcmp((char*)payload, "{\"command\":\"unlock\"}") == 0) {
+        digitalWrite(12, HIGH);
+      } else if (strcmp((char*)payload, "{\"command\":\"lock\"}") == 0) {
+        digitalWrite(12, LOW);
+      }
       break;
   }
-}
-
-void initWebSocket() {
-  ws.onEvent(onEvent);
-  server.addHandler(&ws);
 }
 
 
@@ -102,21 +65,18 @@ void setup() {
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
-  initWebSocket();
+  webSocket.begin(socketUrl, 443, "/ws"); // adjust IP and port
+  webSocket.onEvent(webSocketEvent);
+  webSocket.setReconnectInterval(5000); // auto reconnect every 5s
 
   Serial.println("WebSocket initialized.");
-
-  // Define server routes
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-     request->send(200, "text/plain", "ESP32 Door Lock System with WebSocket");
-  });
 
   // Start server
   server.begin();
 }
 
 void loop() {
-  ws.cleanupClients();  // Clean up WebSocket clients
+  webSocket.loop(); // Handle WebSocket events
 
   // Read current sensor and lock states
   int sensorState = digitalRead(sensorPin); // LOW = door open, HIGH = closed
@@ -140,7 +100,7 @@ void loop() {
                   ",\"lock\":" + String(lockState) +
                   ",\"buzzer\":" + String(buzzerOn) + "}";
     Serial.println(json);
-    ws.textAll(json);
+    webSocket.sendTXT(json);
   }
 
   // Small delay is optional, helps reduce loop churn
