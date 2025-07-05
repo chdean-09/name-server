@@ -3,8 +3,9 @@ import {
   MessageBody,
   SubscribeMessage,
   WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
-import { Socket } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 
 interface DeviceState {
   lock: string; // "locked" | "unlocked"
@@ -18,6 +19,17 @@ interface DeviceState {
   },
 })
 export class DeviceGateway {
+  @WebSocketServer()
+  server: Server;
+
+  handleConnection(client: Socket) {
+    console.log('🔗 Client connected:', client.id);
+  }
+
+  handleDisconnect(client: Socket) {
+    console.log('🔌 Client disconnected:', client.id);
+  }
+
   @SubscribeMessage('device_status')
   handleStatus(
     @MessageBody() data: DeviceState,
