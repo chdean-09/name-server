@@ -13,7 +13,6 @@ interface DeviceState {
 }
 
 @WebSocketGateway({
-  path: '/ws',
   cors: {
     origin: '*',
   },
