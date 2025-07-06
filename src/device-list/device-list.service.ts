@@ -1,14 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
-import { forwardRef, Inject, Injectable } from '@nestjs/common';
-import { DeviceGateway } from 'src/device/device.gateway';
+import { Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from 'src/prisma.service';
 
 @Injectable()
 export class DeviceListService {
   constructor(
     private prisma: PrismaService,
-    @Inject(forwardRef(() => DeviceGateway))
-    private readonly gateway: DeviceGateway,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async create(name: string) {
@@ -52,6 +51,6 @@ export class DeviceListService {
       },
     });
 
-    this.gateway.emitToDevice(id, 'unpair_device', {});
+    this.eventEmitter.emit('device.removed', { deviceId: id });
   }
 }

@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { forwardRef, Inject } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -7,6 +6,7 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
+import { OnEvent } from '@nestjs/event-emitter';
 import { Server, Socket } from 'socket.io';
 import { DeviceListService } from 'src/device-list/device-list.service';
 
@@ -22,10 +22,7 @@ interface DeviceState {
   },
 })
 export class DeviceGateway {
-  constructor(
-    @Inject(forwardRef(() => DeviceListService))
-    private readonly deviceListService: DeviceListService,
-  ) {}
+  constructor(private readonly deviceListService: DeviceListService) {}
   @WebSocketServer()
   server: Server;
 
@@ -38,6 +35,14 @@ export class DeviceGateway {
 
   handleDisconnect(client: Socket) {
     console.log('🔌 Client disconnected:', client.id);
+  }
+
+  @OnEvent('device.removed')
+  handleDeviceRemoved(payload: { deviceId: string }) {
+    console.log(
+      `📡 Device ${payload.deviceId} was removed, sending unpair signal`,
+    );
+    this.emitToDevice(payload.deviceId, 'unpair_device', {});
   }
 
   emitToDevice(deviceId: string, eventName: string, payload: any) {

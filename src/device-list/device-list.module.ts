@@ -7,6 +7,5 @@ import { PrismaModule } from 'src/prisma.module';
   imports: [PrismaModule],
   controllers: [DeviceListController],
   providers: [DeviceListService],
-  exports: [DeviceListService],
 })
 export class DeviceListModule {}
