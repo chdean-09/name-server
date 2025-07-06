@@ -45,28 +45,11 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length)
             String eventName = doc[0];
             Serial.printf("[IOc] event name: %s\n", eventName.c_str());
 
-            // Message Includes a ID for a ACK (callback)
-            if(id) {
-                // create JSON message for Socket.IO (ack)
-                DynamicJsonDocument docOut(1024);
-                JsonArray array = docOut.to<JsonArray>();
-
-                // add payload (parameters) for the ack (callback function)
-                JsonObject param1 = array.createNestedObject();
-                param1["now"] = millis();
-
-                // JSON to String (serializion)
-                String output;
-                output += id;
-                serializeJson(docOut, output);
-
-                // Send event
-                socketIO.send(sIOtype_ACK, output);
-            }
-
             if (eventName == "command") {
               JsonObject payload = doc[1];
               String command = payload["command"];
+
+              Serial.println("[IOc] Command received: " + command);
 
               if (command == "lock") {
                 digitalWrite(doorPin, LOW);
@@ -96,7 +79,7 @@ void setup() {
 
   // Set up pins
   pinMode(doorPin, OUTPUT);
-  digitalWrite(doorPin, HIGH);
+  digitalWrite(doorPin, LOW);
 
   pinMode(sensorPin, INPUT_PULLDOWN);
 

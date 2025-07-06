@@ -54,18 +54,6 @@ export class DeviceGateway {
     client.broadcast.emit('command', data);
   }
 
-  // @SubscribeMessage('device_online')
-  // handleDeviceOnline(
-  //   @MessageBody() data: { deviceName: string },
-  //   @ConnectedSocket() client: Socket,
-  // ) {
-  //   // Notify all clients that this device is online
-  //   client.broadcast.emit('device_online', {
-  //     deviceName: data.deviceName,
-  //     online: true,
-  //   });
-  // }
-
   @SubscribeMessage('heartbeat')
   handleHeartbeat(
     @MessageBody() data: { deviceName: string },
