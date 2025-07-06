@@ -6,7 +6,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -15,48 +14,14 @@ datasource db {
 }
 
 model User {
-  id             String           @id @default(cuid())
-  email          String           @unique
-  passwordHash   String
-  devices        Device[]
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  PairingSession PairingSession[]
+  id       String   @id @default(uuid())
+  email    String   @unique
+  devices  Device[]
 }
 
 model Device {
-  id             String           @id @default(cuid())
-  name           String
-  macAddress     String           @unique // Bluetooth MAC or some UUID
-  wifiSSID       String?
-  ownerId        String
-  owner          User             @relation(fields: [ownerId], references: [id])
-  isClaimed      Boolean          @default(false)
-  lastCommand    CommandType
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  PairingSession PairingSession[]
-}
-
-enum CommandType {
-  LOCK
-  UNLOCK
-}
-
-enum CommandStatus {
-  PENDING
-  SENT
-  EXECUTED
-  FAILED
-}
-
-model PairingSession {
-  id          String    @id @default(cuid())
-  deviceId    String
-  device      Device    @relation(fields: [deviceId], references: [id])
-  userId      String
-  user        User      @relation(fields: [userId], references: [id])
-  isComplete  Boolean   @default(false)
-  startedAt   DateTime  @default(now())
-  completedAt DateTime?
+  id       String   @id @default(uuid())
+  name     String
+  ownerId  String
+  owner    User     @relation(fields: [ownerId], references: [id])
 }

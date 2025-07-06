@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   ConnectedSocket,
   MessageBody,
@@ -32,12 +33,13 @@ export class DeviceGateway {
 
   @SubscribeMessage('device_status')
   handleStatus(
-    @MessageBody() data: DeviceState,
+    @MessageBody() data: [string, DeviceState],
     @ConnectedSocket() client: Socket,
   ) {
-    console.log('📡 Device status:', data);
+    const [_, deviceState] = data;
+    console.log('📡 Device status:', deviceState);
     // You could also broadcast it to other users:
-    client.broadcast.emit('device_status', data);
+    client.broadcast.emit('device_status', deviceState);
   }
 
   @SubscribeMessage('command')

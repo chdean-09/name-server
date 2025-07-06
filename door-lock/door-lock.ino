@@ -1,54 +1,105 @@
 #include <WiFi.h>
-#include <WebServer.h>
 #include <ArduinoJson.h>
+#include <ArduinoWebsockets.h>
 #include <WebSocketsClient.h>
+#include <SocketIOclient.h>
 
-// Replace with your network credentials
-const char* ssid = "PLDTHOMEFIBR_AP5G";
-const char* password = "AndradaFamily321-PLDT-5ghz";
-
-const char* socketUrl = "example.com";
+SocketIOclient socketIO;
 
 const int doorPin = 12;
 const int sensorPin = 19;
-
-// Buzzer pin
 const int buzzerPin = 4;
 
-WebSocketsClient webSocket;
+// Replace with your network credentials
+const char* ssid = "PLDTHOMEFIBR_AP";
+const char* password = "AndradaFamily321-PLDT-2.4ghz";
 
-void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
-  switch(type) {
-    case WStype_DISCONNECTED:
-      Serial.println("[WS] Disconnected");
-      break;
-    case WStype_CONNECTED:
-      Serial.println("[WS] Connected to server");
-      webSocket.sendTXT("{\"sensor\":1,\"lock\":0,\"buzzer\":0}");
-      break;
-    case WStype_TEXT:
-      Serial.printf("[WS] Got message: %s\n", payload);
-      // Handle lock/unlock
-      if (strcmp((char*)payload, "{\"command\":\"unlock\"}") == 0) {
-        digitalWrite(12, HIGH);
-      } else if (strcmp((char*)payload, "{\"command\":\"lock\"}") == 0) {
-        digitalWrite(12, LOW);
-      }
-      break;
-  }
+
+void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length) {
+    switch(type) {
+        case sIOtype_DISCONNECT:
+            Serial.printf("[IOc] Disconnected!\n");
+            break;
+        case sIOtype_CONNECT:
+            Serial.printf("[IOc] Connected to url: %s\n", payload);
+
+            // join default namespace (no auto join in Socket.IO V3)
+            socketIO.send(sIOtype_CONNECT, "/");
+            break;
+        case sIOtype_EVENT:
+        {
+            char * sptr = NULL;
+            int id = strtol((char *)payload, &sptr, 10);
+            Serial.printf("[IOc] get event: %s id: %d\n", payload, id);
+            if(id) {
+                payload = (uint8_t *)sptr;
+            }
+            DynamicJsonDocument doc(1024);
+            DeserializationError error = deserializeJson(doc, payload, length);
+            if(error) {
+                Serial.print(F("deserializeJson() failed: "));
+                Serial.println(error.c_str());
+                return;
+            }
+
+            String eventName = doc[0];
+            Serial.printf("[IOc] event name: %s\n", eventName.c_str());
+
+            // Message Includes a ID for a ACK (callback)
+            if(id) {
+                // create JSON message for Socket.IO (ack)
+                DynamicJsonDocument docOut(1024);
+                JsonArray array = docOut.to<JsonArray>();
+
+                // add payload (parameters) for the ack (callback function)
+                JsonObject param1 = array.createNestedObject();
+                param1["now"] = millis();
+
+                // JSON to String (serializion)
+                String output;
+                output += id;
+                serializeJson(docOut, output);
+
+                // Send event
+                socketIO.send(sIOtype_ACK, output);
+            }
+
+            if (eventName == "command") {
+              JsonObject payload = doc[1];
+              String command = payload["command"];
+
+              if (command == "lock") {
+                digitalWrite(doorPin, LOW);
+              } else if (command == "unlock") {
+                digitalWrite(doorPin, HIGH);
+              }
+            }
+        }
+            break;
+        case sIOtype_ACK:
+            Serial.printf("[IOc] get ack: %u\n", length);
+            break;
+        case sIOtype_ERROR:
+            Serial.printf("[IOc] get error: %u\n", length);
+            break;
+        case sIOtype_BINARY_EVENT:
+            Serial.printf("[IOc] get binary: %u\n", length);
+            break;
+        case sIOtype_BINARY_ACK:
+            Serial.printf("[IOc] get binary ack: %u\n", length);
+            break;
+    }
 }
-
 
 void setup() {
   Serial.begin(115200);
 
+  // Set up pins
   pinMode(doorPin, OUTPUT);
   digitalWrite(doorPin, LOW);
 
   pinMode(sensorPin, INPUT_PULLDOWN);
 
-
-  // Set up buzzer pin
   pinMode(buzzerPin, OUTPUT);
   digitalWrite(buzzerPin, LOW); // Buzzer OFF initially
 
@@ -65,18 +116,26 @@ void setup() {
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
-  webSocket.begin(socketUrl, 443, "/ws"); // adjust IP and port
-  webSocket.onEvent(webSocketEvent);
-  webSocket.setReconnectInterval(5000); // auto reconnect every 5s
+  // server address, port and URL
+  socketIO.beginSSL("name-server-production.up.railway.app", 443, "/socket.io/?EIO=4");
+
+  // event handler
+  socketIO.onEvent(socketIOEvent);
+
+  socketIO.setReconnectInterval(5000); // Reconnect every 5 seconds if disconnected
 
   Serial.println("WebSocket initialized.");
-
-  // Start server
-  server.begin();
 }
 
 void loop() {
-  webSocket.loop(); // Handle WebSocket events
+  socketIO.loop(); // Handle WebSocket events
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi disconnected. Reconnecting...");
+    WiFi.begin(ssid, password);
+    delay(5000);
+  }
+
 
   // Read current sensor and lock states
   int sensorState = digitalRead(sensorPin); // LOW = door open, HIGH = closed
@@ -96,11 +155,28 @@ void loop() {
     lastLockState = lockState;
     lastBuzzerState = buzzerOn;
 
-    String json = "{\"sensor\":" + String(sensorState) +
-                  ",\"lock\":" + String(lockState) +
-                  ",\"buzzer\":" + String(buzzerOn) + "}";
-    Serial.println(json);
-    webSocket.sendTXT(json);
+    // create JSON message for Socket.IO (event)
+    DynamicJsonDocument doc(1024);
+    JsonArray array = doc.to<JsonArray>();
+
+    // add event name
+    // Hint: socket.on('device_status', ....
+    array.add("device_status");
+
+    // add payload (parameters) for the event
+    JsonObject payload = array.createNestedObject();
+    payload["sensor"] = sensorState == HIGH ? "1" : "0";
+    payload["lock"]   = lockState == HIGH ? "1" : "0";
+    payload["buzzer"] = buzzerOn ? "1" : "0";
+
+    // JSON to String (serialization)
+    String output;
+    serializeJson(doc, output);
+
+    // Send event
+    socketIO.sendEVENT(output);
+
+    Serial.println(output);
   }
 
   // Small delay is optional, helps reduce loop churn
