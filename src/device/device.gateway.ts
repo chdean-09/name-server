@@ -70,12 +70,14 @@ export class DeviceGateway {
   }
 
   @SubscribeMessage('heartbeat')
-  handleHeartbeat(
+  async handleHeartbeat(
     @MessageBody() data: { deviceName: string; deviceId: string },
     @ConnectedSocket() client: Socket,
   ) {
     const { deviceName, deviceId } = data;
     console.log(`❤️ heartbeat from ${deviceName}`);
+
+    await client.join(deviceId);
 
     // Emit to all clients that the device is online
     this.server.emit('device_status', {

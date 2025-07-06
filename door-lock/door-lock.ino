@@ -29,6 +29,7 @@ String password = "";
 String deviceName = "";
 // String userToken = "";
 String deviceId = "";
+bool shouldUnpair = false;
 
 void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length) {
     switch(type) {
@@ -112,23 +113,20 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length)
             if (eventName == "unpair_device") {
               Serial.println("[IOc] Unpairing device...");
 
-              socketIO.disconnect();
-              WiFi.disconnect(true); // optional `true` for erase
-
               // Clear stored credentials
               prefs.begin("smartlock", false);
               prefs.clear();
               prefs.end();
 
-              // Reset device state
+              // Reset state
               deviceId = "";
               ssid = "";
               password = "";
               deviceName = "";
               credentialsReceived = false;
 
-              // Restart BLE advertising
-              setupBLE();
+              // Mark for unpairing (BLE will be restarted in loop)
+              shouldUnpair = true;
             }
         }
             break;
@@ -272,9 +270,38 @@ void setup() {
 unsigned long lastHeartbeat = 0;
 
 void loop() {
+  if (Serial.available()) {
+    String input = Serial.readStringUntil('\n');
+    input.trim();
+    if (input == "reset") {
+      Serial.println("🧹 Clearing preferences...");
+      prefs.begin("smartlock", false);
+      prefs.clear();
+      prefs.end();
+      Serial.println("✅ Preferences cleared.");
+      ESP.restart(); // Optional but useful
+    }
+  }
+
   if (!credentialsReceived) {
     delay(100);
     return;
+  }
+
+  if (shouldUnpair) {
+    shouldUnpair = false;
+
+    Serial.println("🧹 Performing full unpair reset...");
+
+    socketIO.disconnect();     // Stop Socket.IO
+    delay(200);                // Allow time for disconnection
+    WiFi.disconnect(true);     // Disconnect and erase credentials
+    WiFi.mode(WIFI_OFF);       // Fully power down Wi-Fi
+    delay(500);                // Let Wi-Fi shut down
+    WiFi.mode(WIFI_STA);       // Reset Wi-Fi mode to station
+
+    setupBLE();                // Restart BLE safely
+    return;                    // Skip loop once
   }
 
   // Stop BLE and connect WiFi once credentials are received
