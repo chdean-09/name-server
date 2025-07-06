@@ -49,6 +49,6 @@ export class DeviceGateway {
   ) {
     console.log('📡 Command received:', data);
     // Send it back to ESP or all clients
-    client.broadcast.emit('message', data);
+    client.broadcast.emit('command', data);
   }
 }
