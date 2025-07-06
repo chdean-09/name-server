@@ -7,6 +7,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { DeviceListService } from 'src/device-list/device-list.service';
 
 interface DeviceState {
   lock: string; // "locked" | "unlocked"
@@ -20,6 +21,7 @@ interface DeviceState {
   },
 })
 export class DeviceGateway {
+  constructor(private readonly deviceListService: DeviceListService) {}
   @WebSocketServer()
   server: Server;
 
@@ -56,14 +58,15 @@ export class DeviceGateway {
 
   @SubscribeMessage('heartbeat')
   handleHeartbeat(
-    @MessageBody() data: { deviceName: string },
+    @MessageBody() data: { deviceName: string; deviceId: string },
     @ConnectedSocket() client: Socket,
   ) {
-    const { deviceName } = data;
+    const { deviceName, deviceId } = data;
     console.log(`❤️ heartbeat from ${deviceName}`);
 
     // Emit to all clients that the device is online
     this.server.emit('device_status', {
+      deviceId,
       deviceName,
       online: true,
     });
@@ -76,6 +79,7 @@ export class DeviceGateway {
     const timeout = setTimeout(() => {
       console.log(`❌ ${deviceName} is now OFFLINE`);
       this.server.emit('device_status', {
+        deviceId,
         deviceName,
         online: false,
       });
@@ -83,5 +87,19 @@ export class DeviceGateway {
     }, this.heartbeatInterval);
 
     this.heartbeatTimers.set(deviceName, timeout);
+  }
+
+  @SubscribeMessage('register_device')
+  async handleRegisterDevice(
+    @MessageBody() data: { deviceName: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const deviceId = await this.deviceListService.create(data.deviceName);
+    console.log(`📦 Registering device: ${data.deviceName} → ID: ${deviceId}`);
+
+    client.emit('register_device', {
+      deviceId,
+      deviceName: data.deviceName,
+    });
   }
 }
