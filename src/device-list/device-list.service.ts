@@ -1,9 +1,14 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { Injectable } from '@nestjs/common';
+import { DeviceGateway } from 'src/device/device.gateway';
 import { PrismaService } from 'src/prisma.service';
 
 @Injectable()
 export class DeviceListService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly gateway: DeviceGateway,
+  ) {}
 
   async create(name: string) {
     const newDevice = await this.prisma.device.create({
@@ -45,5 +50,7 @@ export class DeviceListService {
         id: id,
       },
     });
+
+    this.gateway.emitToDevice(id, 'unpair_device', {});
   }
 }

@@ -36,6 +36,10 @@ export class DeviceGateway {
     console.log('🔌 Client disconnected:', client.id);
   }
 
+  emitToDevice(deviceId: string, eventName: string, payload: any) {
+    this.server.to(deviceId).emit(eventName, payload);
+  }
+
   @SubscribeMessage('device_status')
   handleStatus(
     @MessageBody() data: DeviceState,
@@ -96,6 +100,8 @@ export class DeviceGateway {
   ) {
     const deviceId = await this.deviceListService.create(data.deviceName);
     console.log(`📦 Registering device: ${data.deviceName} → ID: ${deviceId}`);
+
+    await client.join(deviceId);
 
     client.emit('register_device', {
       deviceId,

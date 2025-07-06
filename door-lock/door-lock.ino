@@ -108,6 +108,28 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length)
 
               deviceId = receivedDeviceId; // So we can use it right away
             }
+
+            if (eventName == "unpair_device") {
+              Serial.println("[IOc] Unpairing device...");
+
+              socketIO.disconnect();
+              WiFi.disconnect(true); // optional `true` for erase
+
+              // Clear stored credentials
+              prefs.begin("smartlock", false);
+              prefs.clear();
+              prefs.end();
+
+              // Reset device state
+              deviceId = "";
+              ssid = "";
+              password = "";
+              deviceName = "";
+              credentialsReceived = false;
+
+              // Restart BLE advertising
+              setupBLE();
+            }
         }
             break;
         case sIOtype_ACK:
@@ -224,9 +246,18 @@ void setup() {
   pinMode(buzzerPin, OUTPUT);
   digitalWrite(buzzerPin, LOW); // Start with buzzer off
 
+  // 🔐 Restore credentials from flash
   prefs.begin("smartlock", true);
+  ssid = prefs.getString("ssid", "");
+  password = prefs.getString("password", "");
+  deviceName = prefs.getString("deviceName", "");
   deviceId = prefs.getString("deviceId", "");
   prefs.end();
+
+  // ✅ If credentials were saved, consider them received
+  if (ssid != "" && password != "" && deviceName != "") {
+    credentialsReceived = true;
+  }
 
   if (deviceId.length() > 0) {
     connectToWiFi();
