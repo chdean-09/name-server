@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
+import { forwardRef, Inject } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -21,7 +22,10 @@ interface DeviceState {
   },
 })
 export class DeviceGateway {
-  constructor(private readonly deviceListService: DeviceListService) {}
+  constructor(
+    @Inject(forwardRef(() => DeviceListService))
+    private readonly deviceListService: DeviceListService,
+  ) {}
   @WebSocketServer()
   server: Server;
 

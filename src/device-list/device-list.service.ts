@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { DeviceGateway } from 'src/device/device.gateway';
 import { PrismaService } from 'src/prisma.service';
 
@@ -7,6 +7,7 @@ import { PrismaService } from 'src/prisma.service';
 export class DeviceListService {
   constructor(
     private prisma: PrismaService,
+    @Inject(forwardRef(() => DeviceGateway))
     private readonly gateway: DeviceGateway,
   ) {}
 
