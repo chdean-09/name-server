@@ -33,13 +33,12 @@ export class DeviceGateway {
 
   @SubscribeMessage('device_status')
   handleStatus(
-    @MessageBody() data: [string, DeviceState],
+    @MessageBody() data: DeviceState,
     @ConnectedSocket() client: Socket,
   ) {
-    const [_, deviceState] = data;
-    console.log('📡 Device status:', deviceState);
+    console.log('📡 Device status:', data);
     // You could also broadcast it to other users:
-    client.broadcast.emit('device_status', deviceState);
+    client.broadcast.emit('device_status', data);
   }
 
   @SubscribeMessage('command')

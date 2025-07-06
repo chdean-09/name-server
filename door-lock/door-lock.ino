@@ -96,7 +96,7 @@ void setup() {
 
   // Set up pins
   pinMode(doorPin, OUTPUT);
-  digitalWrite(doorPin, LOW);
+  digitalWrite(doorPin, HIGH);
 
   pinMode(sensorPin, INPUT_PULLDOWN);
 
@@ -155,31 +155,12 @@ void loop() {
     lastLockState = lockState;
     lastBuzzerState = buzzerOn;
 
-    // // create JSON message for Socket.IO (event)
-    // DynamicJsonDocument doc(1024);
-    // JsonArray array = doc.to<JsonArray>();
-
-    // add event name
-    // Hint: socket.on('device_status', ....
-    // array.add("device_status");
-
-    // // add payload (parameters) for the event
-    // JsonObject payload = array.createNestedObject();
-    // payload["sensor"] = sensorState == HIGH ? "1" : "0";
-    // payload["lock"]   = lockState == HIGH ? "1" : "0";
-    // payload["buzzer"] = buzzerOn ? "1" : "0";
-
-    // // JSON to String (serialization)
-    // String output;
-    // serializeJson(doc, output);
-
-    // // Send event
     // ✅ Build event payload
     DynamicJsonDocument payloadDoc(256);
     JsonObject payload = payloadDoc.to<JsonObject>();
-    payload["sensor"] = sensorState == HIGH ? "1" : "0";
-    payload["lock"]   = lockState == HIGH ? "1" : "0";
-    payload["buzzer"] = buzzerOn ? "1" : "0";
+    payload["sensor"] = sensorState == HIGH ? "closed" : "open";
+    payload["lock"]   = lockState == HIGH ? "unlocked" : "locked";
+    payload["buzzer"] = buzzerOn ? "on" : "off";
 
     // ✅ Wrap it inside an array for socket.io
     DynamicJsonDocument eventDoc(512);
