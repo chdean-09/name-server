@@ -23,6 +23,9 @@ export class DeviceGateway {
   @WebSocketServer()
   server: Server;
 
+  private heartbeatTimers = new Map<string, NodeJS.Timeout>();
+  private heartbeatInterval = 10000; // 10 seconds
+
   handleConnection(client: Socket) {
     console.log('🔗 Client connected:', client.id);
   }
@@ -49,5 +52,48 @@ export class DeviceGateway {
     console.log('📡 Command received:', data);
     // Send it back to ESP or all clients
     client.broadcast.emit('command', data);
+  }
+
+  // @SubscribeMessage('device_online')
+  // handleDeviceOnline(
+  //   @MessageBody() data: { deviceName: string },
+  //   @ConnectedSocket() client: Socket,
+  // ) {
+  //   // Notify all clients that this device is online
+  //   client.broadcast.emit('device_online', {
+  //     deviceName: data.deviceName,
+  //     online: true,
+  //   });
+  // }
+
+  @SubscribeMessage('heartbeat')
+  handleHeartbeat(
+    @MessageBody() data: { deviceName: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const { deviceName } = data;
+    console.log(`❤️ heartbeat from ${deviceName}`);
+
+    // Emit to all clients that the device is online
+    this.server.emit('device_status', {
+      deviceName,
+      online: true,
+    });
+
+    // Clear previous timer if exists
+    const prevTimer = this.heartbeatTimers.get(deviceName);
+    if (prevTimer) clearTimeout(prevTimer);
+
+    // Set new timer
+    const timeout = setTimeout(() => {
+      console.log(`❌ ${deviceName} is now OFFLINE`);
+      this.server.emit('device_status', {
+        deviceName,
+        online: false,
+      });
+      this.heartbeatTimers.delete(deviceName);
+    }, this.heartbeatInterval);
+
+    this.heartbeatTimers.set(deviceName, timeout);
   }
 }

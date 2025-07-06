@@ -127,6 +127,8 @@ void setup() {
   Serial.println("WebSocket initialized.");
 }
 
+unsigned long lastHeartbeat = 0;
+
 void loop() {
   socketIO.loop(); // Handle WebSocket events
 
@@ -136,6 +138,20 @@ void loop() {
     delay(5000);
   }
 
+  unsigned long now = millis();
+  if (now - lastHeartbeat > 3000) { // every 3 seconds
+    lastHeartbeat = now;
+
+    DynamicJsonDocument event(256);
+    JsonArray message = event.to<JsonArray>();
+    message.add("heartbeat");
+    JsonObject payload = message.createNestedObject();
+    payload["deviceName"] = "esp32-name-123"; // or unique ID
+
+    String jsonString;
+    serializeJson(event, jsonString);
+    socketIO.sendEVENT(jsonString);
+  }
 
   // Read current sensor and lock states
   int sensorState = digitalRead(sensorPin); // LOW = door open, HIGH = closed
