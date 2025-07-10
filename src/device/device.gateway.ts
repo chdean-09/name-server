@@ -56,6 +56,13 @@ export class DeviceGateway {
     eventName: string,
     payload: any,
   ) {
+    console.log(
+      'does this get called?',
+      userEmail,
+      deviceId,
+      eventName,
+      payload,
+    );
     this.server.to(`${userEmail}-device-${deviceId}`).emit(eventName, payload);
   }
 
@@ -65,11 +72,8 @@ export class DeviceGateway {
     eventName: string,
     payload: any,
   ) {
+    console.log('how about this?', userEmail, deviceId, eventName, payload);
     this.server.to(`${userEmail}-device-${deviceId}`).emit(eventName, payload);
-  }
-
-  emitToAllDevices(eventName: string, payload: any) {
-    this.server.to('device-clients').emit(eventName, payload);
   }
 
   // join rooms for mobile and device clients
@@ -95,7 +99,6 @@ export class DeviceGateway {
     @ConnectedSocket() client: Socket,
   ) {
     const { deviceId, userEmail } = data;
-    await client.join('device-clients'); // Join general device room
     await client.join(`${userEmail}-device-${deviceId}`); // Join specific device room
 
     console.log(`🔧 Device ${userEmail} (${deviceId}) joined device rooms`);
@@ -112,7 +115,6 @@ export class DeviceGateway {
       console.log('Data reveived from device:', data);
 
       // Join device rooms
-      await client.join('device-clients');
       await client.join(`${data.userEmail}-device-${deviceId}`);
 
       console.log(
@@ -170,8 +172,11 @@ export class DeviceGateway {
     console.log(`❤️ heartbeat from ${deviceName}`);
 
     // Make sure device is in correct rooms
-    await client.join('device-clients');
     await client.join(`${data.userEmail}-device-${deviceId}`);
+
+    console.log(
+      `🔧 Device ${deviceName} (${deviceId}) joined room ${userEmail}-device-${deviceId}`,
+    );
 
     // Emit to mobile clients only that the device is online
     this.emitToMobile(userEmail, deviceId, 'device_status', {

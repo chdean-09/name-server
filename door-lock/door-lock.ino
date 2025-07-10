@@ -42,6 +42,17 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length)
             // join default namespace (no auto join in Socket.IO V3)
             socketIO.send(sIOtype_CONNECT, "/");
 
+            DynamicJsonDocument event(512);
+            JsonArray message = event.to<JsonArray>();
+            message.add("join_as_device");
+            JsonObject payload = message.createNestedObject();
+            payload["deviceId"] = deviceId;
+            payload["userEmail"] = userEmail;
+
+            String jsonString;
+            serializeJson(event, jsonString);
+            socketIO.sendEVENT(jsonString);
+
             if (deviceId.length() == 0) {
               // send register_device
               DynamicJsonDocument event(512);
@@ -108,7 +119,7 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length)
                 prefs.end();
 
                 deviceId = receivedDeviceId; // So we can use it right away
-                
+
                 // Read current sensor and lock states
                 int sensorState = digitalRead(sensorPin); // LOW = door open, HIGH = closed
                 int lockState = digitalRead(doorPin);     // LOW = locked, HIGH = unlocked
