@@ -29,10 +29,6 @@ export class DeviceListService {
     return data;
   }
 
-  // findOne(id: number) {
-  //   return `This action returns a #${id} deviceList`;
-  // }
-
   async update(id: string, newName: string) {
     await this.prisma.device.update({
       where: {
@@ -44,13 +40,16 @@ export class DeviceListService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: string, userEmail: string) {
     await this.prisma.device.delete({
       where: {
         id: id,
       },
     });
 
-    this.eventEmitter.emit('device.removed', { deviceId: id });
+    this.eventEmitter.emit('device_removed', {
+      userEmail: userEmail,
+      deviceId: id,
+    });
   }
 }

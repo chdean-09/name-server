@@ -27,7 +27,7 @@ bool credentialsReceived = false;
 String ssid = "";
 String password = "";
 String deviceName = "";
-// String userToken = "";
+String userEmail = "";
 String deviceId = "";
 bool shouldUnpair = false;
 
@@ -42,10 +42,6 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length)
             // join default namespace (no auto join in Socket.IO V3)
             socketIO.send(sIOtype_CONNECT, "/");
 
-            prefs.begin("smartlock", true);
-            deviceId = prefs.getString("deviceId", "");
-            prefs.end();
-
             if (deviceId.length() == 0) {
               // send register_device
               DynamicJsonDocument event(512);
@@ -53,7 +49,7 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length)
               message.add("register_device");
               JsonObject payload = message.createNestedObject();
               payload["deviceName"] = deviceName;
-              // payload["userToken"] = userToken;
+              payload["userEmail"] = userEmail;
 
               String jsonString;
               serializeJson(event, jsonString);
@@ -95,38 +91,60 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length)
 
             if (eventName == "register_device") {
               JsonObject payload = doc[1];
-              String receivedDeviceId = payload["deviceId"];
-              String receivedName = payload["deviceName"];
+              bool success = payload["success"];
 
-              Serial.println("✅ Device registered with backend.");
-              Serial.println("Device ID: " + receivedDeviceId);
-              Serial.println("Name: " + receivedName);
+              if (success) {
+                String receivedDeviceId = payload["deviceId"];
+                String receivedName = payload["deviceName"];
 
-              // Save to flash
-              prefs.begin("smartlock", false);
-              prefs.putString("deviceId", receivedDeviceId);
-              prefs.end();
+                Serial.println("✅ Device registered with backend.");
+                Serial.println("Device ID: " + receivedDeviceId);
+                Serial.println("Name: " + receivedName);
 
-              deviceId = receivedDeviceId; // So we can use it right away
+                // Save to flash
+                prefs.begin("smartlock", false);
+                prefs.putString("deviceId", receivedDeviceId);
+                prefs.putString("deviceName", receivedName);
+                prefs.end();
+
+                deviceId = receivedDeviceId; // So we can use it right away
+              } else {
+                String errorMsg = payload["error"] | "Unknown error";
+                Serial.println("❌ Failed toregisterdevice: " + errorMsg);
+              }
             }
 
             if (eventName == "unpair_device") {
               Serial.println("[IOc] Unpairing device...");
 
-              // Clear stored credentials
+              // Clear stored preferences
               prefs.begin("smartlock", false);
               prefs.clear();
               prefs.end();
 
-              // Reset state
+              // Reset internal state
               deviceId = "";
               ssid = "";
               password = "";
               deviceName = "";
               credentialsReceived = false;
 
-              // Mark for unpairing (BLE will be restarted in loop)
+              // Mark for reset in loop()
               shouldUnpair = true;
+
+              // Clean disconnect (optional but recommended)
+              socketIO.disconnect();
+            }
+
+            if (eventName == "request_status") {
+              // Read current sensor and lock states
+              int sensorState = digitalRead(sensorPin); // LOW = door open, HIGH = closed
+              int lockState = digitalRead(doorPin);     // LOW = locked, HIGH = unlocked
+
+              // 🔔 Trigger buzzer if door is open while locked
+              bool buzzerOn = (sensorState == LOW && lockState == LOW);
+
+              sendDeviceStatus(socketIO, deviceId, deviceName, sensorState, lockState, buzzerOn);
             }
         }
             break;
@@ -157,20 +175,20 @@ class SmartLockBLECallbacks : public BLECharacteristicCallbacks {
       ssid = doc["ssid"].as<String>();
       password = doc["pass"].as<String>();
       deviceName = doc["deviceName"].as<String>();
-      // userToken = doc["userToken"].as<String>();
+      userEmail = doc["userEmail"].as<String>();
       credentialsReceived = true;
 
       Serial.println("✅ Received credentials via BLE:");
       Serial.println("SSID: " + ssid);
       Serial.println("PASS: " + password);
       Serial.println("Device Name: " + deviceName);
-      // Serial.println("User Token: " + userToken);
+      Serial.println("User Email: " + userEmail);
 
       prefs.begin("smartlock", false);
       prefs.putString("ssid", ssid);
       prefs.putString("password", password);
       prefs.putString("deviceName", deviceName);
-      // prefs.putString("userToken", userToken);
+      prefs.putString("userEmail", userEmail);
       prefs.end();
     } else {
       Serial.println("❌ Failed to parse BLE WiFi credentials.");
@@ -235,6 +253,29 @@ void setupSocket() {
   Serial.println("WebSocket initialized.");
 }
 
+void sendDeviceStatus(SocketIOclient& socket, const String& deviceId, const String& deviceName, int sensorState, int lockState, bool buzzerOn) {
+  DynamicJsonDocument event(256);
+  JsonArray message = event.to<JsonArray>();
+  message.add("heartbeat");
+
+  JsonObject payload = message.createNestedObject();
+  payload["userEmail"] = userEmail;
+  payload["deviceId"] = deviceId;
+  payload["deviceName"] = deviceName;
+  payload["sensor"] = sensorState == HIGH ? "closed" : "open";
+  payload["lock"]   = lockState == HIGH ? "unlocked" : "locked";
+  payload["buzzer"] = buzzerOn ? "on" : "off";
+
+  String jsonString;
+  serializeJson(event, jsonString);
+  socket.sendEVENT(jsonString);
+
+  Serial.println("📤 Sent status update:");
+  Serial.println(jsonString);
+}
+
+
+// Setup function runs once at startup
 void setup() {
   Serial.begin(115200);
 
@@ -250,6 +291,7 @@ void setup() {
   password = prefs.getString("password", "");
   deviceName = prefs.getString("deviceName", "");
   deviceId = prefs.getString("deviceId", "");
+  userEmail = prefs.getString("userEmail", "");
   prefs.end();
 
   // ✅ If credentials were saved, consider them received
@@ -283,26 +325,24 @@ void loop() {
     }
   }
 
+  if (shouldUnpair) {
+    shouldUnpair = false;
+
+    // Fully stop Wi-Fi and WebSocket
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    delay(500);
+
+    setupBLE();  // restart BLE advertising
+    return;
+  }
+
+  // Skip main logic if not paired yet
   if (!credentialsReceived) {
     delay(100);
     return;
   }
 
-  if (shouldUnpair) {
-    shouldUnpair = false;
-
-    Serial.println("🧹 Performing full unpair reset...");
-
-    socketIO.disconnect();     // Stop Socket.IO
-    delay(200);                // Allow time for disconnection
-    WiFi.disconnect(true);     // Disconnect and erase credentials
-    WiFi.mode(WIFI_OFF);       // Fully power down Wi-Fi
-    delay(500);                // Let Wi-Fi shut down
-    WiFi.mode(WIFI_STA);       // Reset Wi-Fi mode to station
-
-    setupBLE();                // Restart BLE safely
-    return;                    // Skip loop once
-  }
 
   // Stop BLE and connect WiFi once credentials are received
   if (WiFi.status() != WL_CONNECTED) {
@@ -316,22 +356,6 @@ void loop() {
 
   socketIO.loop(); // Handle WebSocket events
 
-  unsigned long now = millis();
-  if (now - lastHeartbeat > 3000) { // every 3 seconds
-    lastHeartbeat = now;
-
-    DynamicJsonDocument event(256);
-    JsonArray message = event.to<JsonArray>();
-    message.add("heartbeat");
-    JsonObject payload = message.createNestedObject();
-    payload["deviceId"] = deviceId;
-    payload["deviceName"] = deviceName;
-
-    String jsonString;
-    serializeJson(event, jsonString);
-    socketIO.sendEVENT(jsonString);
-  }
-
   // Read current sensor and lock states
   int sensorState = digitalRead(sensorPin); // LOW = door open, HIGH = closed
   int lockState = digitalRead(doorPin);     // LOW = locked, HIGH = unlocked
@@ -339,6 +363,13 @@ void loop() {
   // 🔔 Trigger buzzer if door is open while locked
   bool buzzerOn = (sensorState == LOW && lockState == LOW);
   digitalWrite(buzzerPin, buzzerOn ? HIGH : LOW);
+
+  unsigned long now = millis();
+  if (now - lastHeartbeat > 3000) { // every 3 seconds
+    lastHeartbeat = now;
+
+    sendDeviceStatus(socketIO, deviceId, deviceName, sensorState, lockState, buzzerOn);
+  }
 
   // 📡 Notify clients if state changes
   static int lastSensorState = -1;
@@ -350,25 +381,7 @@ void loop() {
     lastLockState = lockState;
     lastBuzzerState = buzzerOn;
 
-    // ✅ Build event payload
-    DynamicJsonDocument payloadDoc(256);
-    JsonObject payload = payloadDoc.to<JsonObject>();
-    payload["sensor"] = sensorState == HIGH ? "closed" : "open";
-    payload["lock"]   = lockState == HIGH ? "unlocked" : "locked";
-    payload["buzzer"] = buzzerOn ? "on" : "off";
-
-    // ✅ Wrap it inside an array for socket.io
-    DynamicJsonDocument eventDoc(512);
-    JsonArray message = eventDoc.to<JsonArray>();
-    message.add("device_status"); // Event name
-    message.add(payload);         // Payload object
-
-    // ✅ Serialize and send
-    String jsonString;
-    serializeJson(eventDoc, jsonString);
-    socketIO.sendEVENT(jsonString);
-
-    Serial.println(jsonString);
+    sendDeviceStatus(socketIO, deviceId, deviceName, sensorState, lockState, buzzerOn);
   }
 
   // Small delay is optional, helps reduce loop churn
