@@ -37,6 +37,7 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length)
             Serial.printf("[IOc] Disconnected!\n");
             break;
         case sIOtype_CONNECT:
+        {
             Serial.printf("[IOc] Connected to url: %s\n", payload);
 
             // join default namespace (no auto join in Socket.IO V3)
@@ -66,7 +67,7 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length)
               serializeJson(event, jsonString);
               socketIO.sendEVENT(jsonString);
             }
-
+        }
             break;
         case sIOtype_EVENT:
         {

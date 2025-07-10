@@ -179,7 +179,7 @@ export class DeviceGateway {
     );
 
     // Emit to mobile clients only that the device is online
-    this.emitToMobile(userEmail, deviceId, 'device_status', {
+    this.emitToMobile(userEmail, deviceId, 'heartbeat', {
       deviceId,
       deviceName,
       online: true,
@@ -195,7 +195,7 @@ export class DeviceGateway {
     // Set new timer
     const timeout = setTimeout(() => {
       console.log(`❌ ${deviceName} is now OFFLINE`);
-      this.emitToMobile(userEmail, deviceId, 'device_status', {
+      this.emitToMobile(userEmail, deviceId, 'heartbeat', {
         deviceId,
         deviceName,
         online: false,
