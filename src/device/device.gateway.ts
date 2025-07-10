@@ -56,13 +56,6 @@ export class DeviceGateway {
     eventName: string,
     payload: any,
   ) {
-    console.log(
-      'does this get called?',
-      userEmail,
-      deviceId,
-      eventName,
-      payload,
-    );
     this.server.to(`${userEmail}-device-${deviceId}`).emit(eventName, payload);
   }
 
@@ -72,7 +65,6 @@ export class DeviceGateway {
     eventName: string,
     payload: any,
   ) {
-    console.log('how about this?', userEmail, deviceId, eventName, payload);
     this.server.to(`${userEmail}-device-${deviceId}`).emit(eventName, payload);
   }
 
@@ -84,7 +76,7 @@ export class DeviceGateway {
   ) {
     const { userEmail, deviceId } = data;
 
-    await client.join(`${userEmail}-device-${deviceId}`); // Join the room with user email
+    await client.join(`${userEmail}-device-${deviceId}`);
 
     console.log(
       `🔧 Mobile joined device room: ${userEmail}-device-${deviceId}`,
@@ -99,9 +91,9 @@ export class DeviceGateway {
     @ConnectedSocket() client: Socket,
   ) {
     const { deviceId, userEmail } = data;
-    await client.join(`${userEmail}-device-${deviceId}`); // Join specific device room
+    await client.join(`${userEmail}-device-${deviceId}`);
 
-    console.log(`🔧 Device ${userEmail} (${deviceId}) joined device rooms`);
+    console.log(`🔧 Device joined room: ${userEmail}-device-${deviceId}`);
   }
 
   // register and unpair logic
@@ -145,6 +137,7 @@ export class DeviceGateway {
   }
 
   // command received from the mobile app
+  // and will be sent to the esp32 client
   @SubscribeMessage('command')
   handleCommand(
     @MessageBody()
@@ -163,20 +156,14 @@ export class DeviceGateway {
   }
 
   // heartbeat received from the esp32 client
+  // and will be sent to mobile client
   @SubscribeMessage('heartbeat')
-  async handleHeartbeat(
+  handleHeartbeat(
     @MessageBody() data: Heartbeat,
     @ConnectedSocket() client: Socket,
   ) {
     const { deviceName, deviceId, userEmail } = data;
     console.log(`❤️ heartbeat from ${deviceName}`);
-
-    // Make sure device is in correct rooms
-    await client.join(`${data.userEmail}-device-${deviceId}`);
-
-    console.log(
-      `🔧 Device ${deviceName} (${deviceId}) joined room ${userEmail}-device-${deviceId}`,
-    );
 
     // Emit to mobile clients only that the device is online
     this.emitToMobile(userEmail, deviceId, 'heartbeat', {
@@ -204,7 +191,7 @@ export class DeviceGateway {
         buzzer: data.buzzer,
       });
       this.heartbeatTimers.delete(deviceId);
-    }, 10000); // 10 seconds
+    }, 3); // 3 seconds
 
     this.heartbeatTimers.set(deviceId, timeout);
   }
