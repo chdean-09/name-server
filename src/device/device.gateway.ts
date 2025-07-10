@@ -109,11 +109,15 @@ export class DeviceGateway {
   ) {
     try {
       const deviceId = await this.deviceListService.create(data.deviceName);
-      console.log(`📦 Registered device: ${data.deviceName} → ID: ${deviceId}`);
+      console.log('Data reveived from device:', data);
 
       // Join device rooms
       await client.join('device-clients');
       await client.join(`${data.userEmail}-device-${deviceId}`);
+
+      console.log(
+        `Device has joined room ${data.userEmail}-device-${deviceId}`,
+      );
 
       // Respond to the device that registered
       client.emit('register_device', {
