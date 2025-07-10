@@ -108,6 +108,15 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length)
                 prefs.end();
 
                 deviceId = receivedDeviceId; // So we can use it right away
+                
+                // Read current sensor and lock states
+                int sensorState = digitalRead(sensorPin); // LOW = door open, HIGH = closed
+                int lockState = digitalRead(doorPin);     // LOW = locked, HIGH = unlocked
+
+                // 🔔 Trigger buzzer if door is open while locked
+                bool buzzerOn = (sensorState == LOW && lockState == LOW);
+
+                sendDeviceStatus(socketIO, deviceId, deviceName, sensorState, lockState, buzzerOn);
               } else {
                 String errorMsg = payload["error"] | "Unknown error";
                 Serial.println("❌ Failed toregisterdevice: " + errorMsg);

@@ -123,7 +123,6 @@ export class DeviceGateway {
       client.emit('register_device', {
         deviceId,
         deviceName: data.deviceName,
-        userEmail: data.userEmail,
         success: true,
       });
     } catch (error) {
@@ -172,7 +171,7 @@ export class DeviceGateway {
 
     // Make sure device is in correct rooms
     await client.join('device-clients');
-    await client.join(`device-${deviceId}`);
+    await client.join(`${data.userEmail}-device-${deviceId}`);
 
     // Emit to mobile clients only that the device is online
     this.emitToMobile(userEmail, deviceId, 'device_status', {
