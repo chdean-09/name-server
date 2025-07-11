@@ -29,6 +29,23 @@ export class DeviceListService {
     return data;
   }
 
+  async findOne(id: string) {
+    const device = await this.prisma.device.findUnique({
+      where: {
+        id: id,
+      },
+      include: {
+        schedule: true,
+      },
+    });
+
+    if (!device) {
+      throw new Error('Device not found');
+    }
+
+    return device;
+  }
+
   async update(id: string, newName: string) {
     await this.prisma.device.update({
       where: {
