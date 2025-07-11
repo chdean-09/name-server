@@ -191,7 +191,7 @@ export class DeviceGateway {
         buzzer: data.buzzer,
       });
       this.heartbeatTimers.delete(deviceId);
-    }, 3000); // 3 seconds
+    }, 6000); // 3 seconds
 
     this.heartbeatTimers.set(deviceId, timeout);
   }
