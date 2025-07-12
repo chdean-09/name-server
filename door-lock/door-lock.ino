@@ -314,6 +314,7 @@ void sendDeviceStatus(SocketIOclient &socket, const String &deviceId, const Stri
   payload["sensor"] = sensorState == HIGH ? "closed" : "open";
   payload["lock"] = lockState == HIGH ? "unlocked" : "locked";
   payload["buzzer"] = buzzerOn ? "on" : "off";
+  payload["rssi"] = WiFi.RSSI();
 
   String jsonString;
   serializeJson(event, jsonString);

@@ -17,6 +17,7 @@ interface Heartbeat {
   lock: 'locked' | 'unlocked';
   sensor: 'open' | 'closed';
   buzzer: 'on' | 'off';
+  rssi: number;
 }
 
 @WebSocketGateway({
@@ -173,6 +174,7 @@ export class DeviceGateway {
       lock: data.lock,
       sensor: data.sensor,
       buzzer: data.buzzer,
+      rssi: data.rssi,
     });
 
     // Clear previous timer if exists
@@ -189,6 +191,7 @@ export class DeviceGateway {
         lock: data.lock,
         sensor: data.sensor,
         buzzer: data.buzzer,
+        rssi: 0,
       });
       this.heartbeatTimers.delete(deviceId);
     }, 6000); // 3 seconds
