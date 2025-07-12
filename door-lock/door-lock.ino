@@ -1,6 +1,5 @@
 #include <WiFi.h>
 #include <ArduinoJson.h>
-#include <ArduinoWebsockets.h>
 #include <WebSocketsClient.h>
 #include <SocketIOclient.h>
 #include <BLEDevice.h>
@@ -28,7 +27,6 @@ String password = "";
 String deviceName = "";
 String userEmail = "";
 String deviceId = "";
-bool shouldUnpair = false;
 
 void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
 {
@@ -75,7 +73,7 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
   {
     char *sptr = NULL;
     int id = strtol((char *)payload, &sptr, 10);
-    Serial.printf("[IOc] get event: %s id: %d\n", payload, id);
+    // Serial.printf("[IOc] get event: %s id: %d\n", payload, id);
     if (id)
     {
       payload = (uint8_t *)sptr;
@@ -90,7 +88,7 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
     }
 
     String eventName = doc[0];
-    Serial.printf("[IOc] event name: %s\n", eventName.c_str());
+    // Serial.printf("[IOc] event name: %s\n", eventName.c_str());
 
     if (eventName == "command")
     {
@@ -163,11 +161,16 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
       deviceName = "";
       credentialsReceived = false;
 
-      // Mark for reset in loop()
-      shouldUnpair = true;
-
       // Clean disconnect (optional but recommended)
       socketIO.disconnect();
+
+      // Fully stop Wi-Fi and WebSocket
+      WiFi.disconnect(true);
+      WiFi.mode(WIFI_OFF);
+      delay(500);
+
+      // Optionally restart the ESP32 for a clean state
+      ESP.restart();
     }
 
     if (eventName == "request_status")
@@ -293,7 +296,7 @@ void setupSocket()
 
   socketIO.onEvent(socketIOEvent);
 
-  socketIO.setReconnectInterval(5000); // Reconnect every 5 seconds if disconnected
+  socketIO.setReconnectInterval(2000); // Reconnect every 2 seconds if disconnected
 
   Serial.println("WebSocket initialized.");
 }
@@ -351,6 +354,7 @@ void setup()
     connectToWiFi();
     if (WiFi.status() == WL_CONNECTED)
     {
+      delay(1000); // Give WiFi time to stabilize
       setupSocket();
     }
   }
@@ -379,19 +383,6 @@ void loop()
     }
   }
 
-  if (shouldUnpair)
-  {
-    shouldUnpair = false;
-
-    // Fully stop Wi-Fi and WebSocket
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
-    delay(500);
-
-    setupBLE(); // restart BLE advertising
-    return;
-  }
-
   // Skip main logic if not paired yet
   if (!credentialsReceived)
   {
@@ -405,11 +396,12 @@ void loop()
     connectToWiFi();
     if (WiFi.status() == WL_CONNECTED)
     {
+      delay(1000);
       setupSocket();
     }
     else
     {
-      return;
+      return; // If WiFi connection failed, skip the rest of the loop
     }
   }
 
@@ -424,7 +416,7 @@ void loop()
   digitalWrite(buzzerPin, buzzerOn ? HIGH : LOW);
 
   unsigned long now = millis();
-  if (now - lastHeartbeat > 3000)
+  if (now - lastHeartbeat > 3000 && socketIO.isConnected())
   { // every 3 seconds
     lastHeartbeat = now;
 
@@ -442,7 +434,10 @@ void loop()
     lastLockState = lockState;
     lastBuzzerState = buzzerOn;
 
-    sendDeviceStatus(socketIO, deviceId, deviceName, sensorState, lockState, buzzerOn);
+    if (socketIO.isConnected())
+    {
+      sendDeviceStatus(socketIO, deviceId, deviceName, sensorState, lockState, buzzerOn);
+    }
   }
 
   // Small delay is optional, helps reduce loop churn

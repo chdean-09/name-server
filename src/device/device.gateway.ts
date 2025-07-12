@@ -129,10 +129,14 @@ export class DeviceGateway {
   }
 
   @OnEvent('device_removed')
-  handleDeviceRemoved(payload: { userEmail: string; deviceId: string }) {
+  async handleDeviceRemoved(
+    payload: { userEmail: string; deviceId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
     console.log(
       `📡 Device ${payload.deviceId} was removed, sending unpair signal`,
     );
+    await client.leave(`${payload.userEmail}-device-${payload.deviceId}`);
     this.emitToDevice(payload.userEmail, payload.deviceId, 'unpair_device', {});
   }
 
