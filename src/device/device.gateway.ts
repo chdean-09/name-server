@@ -129,15 +129,11 @@ export class DeviceGateway {
   }
 
   @OnEvent('device_removed')
-  async handleDeviceRemoved(
-    payload: { userEmail: string; deviceId: string },
-    @ConnectedSocket() client: Socket,
-  ) {
+  handleDeviceRemoved(payload: { userEmail: string; deviceId: string }) {
     console.log(
       `📡 Device ${payload.deviceId} was removed, sending unpair signal`,
     );
     this.emitToDevice(payload.userEmail, payload.deviceId, 'unpair_device', {});
-    await client.leave(`${payload.userEmail}-device-${payload.deviceId}`);
   }
 
   // command received from the mobile app
