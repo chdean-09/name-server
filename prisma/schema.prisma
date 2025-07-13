@@ -37,7 +37,7 @@ enum ScheduleType {
 model Schedule {
   id        String       @id @default(uuid())
   deviceId  String
-  device    Device       @relation(fields: [deviceId], references: [id])
+  device    Device       @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   isEnabled Boolean      @default(true)
   type      ScheduleType
   time      String
