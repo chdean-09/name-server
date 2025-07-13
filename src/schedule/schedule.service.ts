@@ -20,8 +20,6 @@ export class ScheduleService {
     const currentTime = now.toFormat('HH:mm');
     const today = now.toFormat('ccc'); // "Mon", "Tue", etc.
 
-    console.log('⏰ Checking schedules at', currentTime, 'on', today);
-
     // Find all enabled schedules for this time and day
     const schedules = await this.prisma.schedule.findMany({
       where: {
