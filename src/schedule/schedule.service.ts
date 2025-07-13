@@ -5,6 +5,7 @@ import { Schedule } from '@prisma/client';
 import { PrismaService } from 'src/prisma.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DeviceGateway } from 'src/device/device.gateway';
+import { DateTime } from 'luxon';
 
 @Injectable()
 export class ScheduleService {
@@ -15,15 +16,11 @@ export class ScheduleService {
 
   @Cron(CronExpression.EVERY_MINUTE)
   async handleCron() {
-    const now = new Date();
-    const hours = now.getHours().toString().padStart(2, '0');
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    const currentTime = `${hours}:${minutes}`;
-    console.log('⏰ Checking schedules at', currentTime);
+    const now = DateTime.now().setZone('Asia/Manila');
+    const currentTime = now.toFormat('HH:mm');
+    const today = now.toFormat('ccc'); // "Mon", "Tue", etc.
 
-    // Get current day as "Mon", "Tue", etc.
-    const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const today = daysOfWeek[now.getDay()];
+    console.log('⏰ Checking schedules at', currentTime, 'on', today);
 
     // Find all enabled schedules for this time and day
     const schedules = await this.prisma.schedule.findMany({
