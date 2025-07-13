@@ -47,7 +47,7 @@ export class DeviceListService {
     return device;
   }
 
-  async update(id: string, newName: string) {
+  async update(id: string, newName: string, userEmail: string) {
     await this.prisma.device.update({
       where: {
         id: id,
@@ -55,6 +55,12 @@ export class DeviceListService {
       data: {
         name: newName,
       },
+    });
+
+    this.eventEmitter.emit('device_renamed', {
+      userEmail: userEmail,
+      deviceId: id,
+      newName: newName,
     });
   }
 

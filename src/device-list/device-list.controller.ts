@@ -32,9 +32,12 @@ export class DeviceListController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: { newName: string }) {
-    const { newName } = body;
-    return this.deviceListService.update(id, newName);
+  update(
+    @Param('id') id: string,
+    @Body() body: { newName: string; userEmail: string },
+  ) {
+    const { newName, userEmail } = body;
+    return this.deviceListService.update(id, newName, userEmail);
   }
 
   @Delete(':id')

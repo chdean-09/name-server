@@ -27,6 +27,8 @@ String password = "";
 String deviceName = "";
 String userEmail = "";
 String deviceId = "";
+int wifiFailCount = 0;
+bool bleActive = false;
 
 void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
 {
@@ -173,6 +175,22 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
       ESP.restart();
     }
 
+    if (eventName == "rename_device")
+    {
+      Serial.println("[IOc] Renaming device...");
+
+      JsonObject payload = doc[1];
+
+      String newName = payload["newName"];
+
+      // Clear stored preferences
+      prefs.begin("smartlock", false);
+      prefs.putString("deviceName", newName);
+      prefs.end();
+
+      deviceName = newName;
+    }
+
     if (eventName == "request_status")
     {
       // Read current sensor and lock states
@@ -256,12 +274,12 @@ void setupBLE()
 
   pAdvertising->addServiceUUID(SERVICE_UUID);
   pAdvertising->start();
+  bleActive = true; // Mark BLE as active
   Serial.println("🔵 BLE advertising started.");
 }
 
 void connectToWiFi()
 {
-  BLEDevice::deinit(true); // Turn off BLE
   delay(1000);
 
   prefs.begin("smartlock", true);
@@ -283,10 +301,23 @@ void connectToWiFi()
   if (WiFi.status() == WL_CONNECTED)
   {
     Serial.println("\n✅ WiFi connected: " + WiFi.localIP().toString());
+    wifiFailCount = 0;
+    if (bleActive)
+    {
+      BLEDevice::deinit(true); // Turn off BLE now that WiFi is up
+      bleActive = false;
+    }
   }
   else
   {
     Serial.println("\n❌ WiFi failed to connect. Check credentials.");
+    wifiFailCount++;
+    if (!bleActive)
+    {
+      setupBLE();
+      bleActive = true;
+      Serial.println("🔵 BLE re-enabled for re-pairing.");
+    }
   }
 }
 

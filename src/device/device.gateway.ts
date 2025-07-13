@@ -140,6 +140,20 @@ export class DeviceGateway {
     this.emitToDevice(payload.userEmail, payload.deviceId, 'unpair_device', {});
   }
 
+  @OnEvent('device_renamed')
+  handleDeviceRenamed(payload: {
+    userEmail: string;
+    deviceId: string;
+    newName: string;
+  }) {
+    console.log(
+      `📡 Device ${payload.deviceId} was renamed, new name is ${payload.newName}`,
+    );
+    this.emitToDevice(payload.userEmail, payload.deviceId, 'rename_device', {
+      newName: payload.newName,
+    });
+  }
+
   // command received from the mobile app
   // and will be sent to the esp32 client
   @SubscribeMessage('command')
