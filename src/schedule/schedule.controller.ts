@@ -9,6 +9,10 @@ export class ScheduleController {
   @Post()
   create(@Body() body: { deviceId: string; schedule: Schedule }) {
     const { deviceId, schedule } = body;
+    console.log(
+      `Creating schedule for device ${deviceId} with data:`,
+      schedule,
+    );
     return this.scheduleService.create(deviceId, schedule);
   }
 
