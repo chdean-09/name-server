@@ -19,6 +19,7 @@ export class ScheduleService {
     const hours = now.getHours().toString().padStart(2, '0');
     const minutes = now.getMinutes().toString().padStart(2, '0');
     const currentTime = `${hours}:${minutes}`;
+    console.log('⏰ Checking schedules at', currentTime);
 
     // Get current day as "Mon", "Tue", etc.
     const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

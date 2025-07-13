@@ -259,7 +259,16 @@ class SmartLockBLECallbacks : public BLECharacteristicCallbacks
 
 void setupBLE()
 {
-  BLEDevice::init("NAME-Smartlock-" + String((uint32_t)ESP.getEfuseMac(), HEX));
+  String bleName;
+  if (deviceName == "")
+  {
+    bleName = "NAME-Smartlock-" + String((uint32_t)ESP.getEfuseMac(), HEX);
+  }
+  else
+  {
+    bleName = deviceName;
+  }
+  BLEDevice::init(bleName);
   pServer = BLEDevice::createServer();
   BLEService *pService = pServer->createService(SERVICE_UUID);
 
