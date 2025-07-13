@@ -10,10 +10,11 @@ export class DeviceListService {
     private eventEmitter: EventEmitter2,
   ) {}
 
-  async create(name: string) {
+  async create(name: string, userEmail: string) {
     const newDevice = await this.prisma.device.create({
       data: {
         name,
+        userEmail,
       },
     });
 

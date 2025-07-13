@@ -13,21 +13,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id      String   @id @default(uuid())
+  email   String   @unique
+  devices Device[]
+}
+
 model Device {
-  id         String     @id @default(uuid())
-  name       String
-  // identifier String     @unique
-  schedule   Schedule[]
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  id        String     @id @default(uuid())
+  name      String
+  userEmail String
+  user      User       @relation(fields: [userEmail], references: [email])
+  schedule  Schedule[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+enum ScheduleType {
+  LOCK
+  UNLOCK
 }
 
 model Schedule {
-  id         String @id @default(uuid())
-  deviceId   String
-  device     Device @relation(fields: [deviceId], references: [id])
-  lockDay    String
-  unlockDay  String
-  lockTime   String
-  unlockTime String
+  id        String       @id @default(uuid())
+  deviceId  String
+  device    Device       @relation(fields: [deviceId], references: [id])
+  isEnabled Boolean      @default(true)
+  type      ScheduleType
+  time      String
+  days      String[]
 }

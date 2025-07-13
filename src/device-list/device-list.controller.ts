@@ -14,9 +14,9 @@ export class DeviceListController {
   constructor(private readonly deviceListService: DeviceListService) {}
 
   @Post()
-  async create(@Body() body: { name: string }) {
-    const { name } = body;
-    const newDevice = await this.deviceListService.create(name);
+  async create(@Body() body: { name: string; userEmail: string }) {
+    const { name, userEmail } = body;
+    const newDevice = await this.deviceListService.create(name, userEmail);
 
     return { deviceId: newDevice };
   }

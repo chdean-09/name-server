@@ -104,7 +104,10 @@ export class DeviceGateway {
     @ConnectedSocket() client: Socket,
   ) {
     try {
-      const deviceId = await this.deviceListService.create(data.deviceName);
+      const deviceId = await this.deviceListService.create(
+        data.deviceName,
+        data.userEmail,
+      );
       console.log('Data reveived from device:', data);
 
       // Join device rooms

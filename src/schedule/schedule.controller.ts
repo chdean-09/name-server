@@ -8,7 +8,6 @@ export class ScheduleController {
 
   @Post()
   create(@Body() body: { deviceId: string; schedule: Schedule }) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { deviceId, schedule } = body;
     return this.scheduleService.create(deviceId, schedule);
   }
@@ -20,7 +19,7 @@ export class ScheduleController {
 
   // @Get(':id')
   // findOne(@Param('id') id: string) {
-  //   return this.scheduleService.findOne(+id);
+  //   return this.scheduleService.findOne(id);
   // }
 
   // @Patch(':id')
