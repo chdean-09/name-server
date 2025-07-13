@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, Delete } from '@nestjs/common';
+import { Controller, Post, Body, Param, Delete, Patch } from '@nestjs/common';
 import { ScheduleService } from './schedule.service';
 import { Schedule } from '@prisma/client';
 
@@ -22,13 +22,10 @@ export class ScheduleController {
   //   return this.scheduleService.findOne(id);
   // }
 
-  // @Patch(':id')
-  // update(
-  //   @Param('id') id: string,
-  //   @Body() updateScheduleDto: UpdateScheduleDto,
-  // ) {
-  //   return this.scheduleService.update(+id, updateScheduleDto);
-  // }
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() body: { isEnabled: boolean }) {
+    return this.scheduleService.update(id, body.isEnabled);
+  }
 
   @Delete(':id')
   remove(@Param('id') id: string) {

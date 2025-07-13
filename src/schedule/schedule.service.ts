@@ -35,7 +35,6 @@ export class ScheduleService {
     });
 
     for (const schedule of schedules) {
-      console.log(schedule.device.userEmail);
       const command = schedule.type === 'LOCK' ? 'lock' : 'unlock';
       // Emit to device via gateway
       this.deviceGateway.emitToDevice(
@@ -69,9 +68,12 @@ export class ScheduleService {
   //   return `This action returns a #${id} schedule`;
   // }
 
-  // update(id: number, updateScheduleDto: UpdateScheduleDto) {
-  //   return `This action updates a #${id} schedule`;
-  // }
+  async update(id: string, isEnabled: boolean) {
+    await this.prisma.schedule.update({
+      where: { id: id },
+      data: { isEnabled: isEnabled },
+    });
+  }
 
   async remove(id: string) {
     await this.prisma.schedule.delete({
